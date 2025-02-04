@@ -1,36 +1,84 @@
 import axios from "axios"
+import fs from 'fs'
 
-const conversationHistory = []
-export const processMessage = async (message, userNumber, msg) => {
-  if (!conversationHistory[userNumber])
-    conversationHistory[userNumber] = []
+// const conversationHistory = []
+const historyFilePath = 'src/utils/conversationHistory.json'
+const messageNumberHistory = 10
 
-  conversationHistory[userNumber].push({ "role": "user", "content": message })
+export const processMessage = async (message, userNumber, chatId) => {
+  const userNumberChatId = `${userNumber}${chatId}`
 
-  if (conversationHistory[userNumber].length > 10)
-    conversationHistory[userNumber].shift()
+  let conversationHistory = []
+  try {
+    const arq = JSON.parse(fs.readFileSync(historyFilePath, { encoding: 'utf-8' }))
+    conversationHistory = arq
+  } catch (e) {
+  }
+
+  const savedChatHistory = conversationHistory.find(chat => chat.id === userNumberChatId)
+
+  if (!savedChatHistory)
+    conversationHistory.push({ id: userNumberChatId, history: [] })
+
+  const editedChatHistory = conversationHistory.find(chat => chat.id === userNumberChatId)
+
+  editedChatHistory.history.push({ "role": "user", "content": message })
+
+  if (editedChatHistory.history.length > messageNumberHistory * 2)
+    editedChatHistory.history.shift()
+
+  // console.log(editedChatHistory.history)
 
   const body = {
     "model": "deepseek-r1-distill-llama-8b",
     "messages": [
-      { "role": "system", "content": "Responda de forma amigável e mantendo contexto da conversa, a menos que explicitamente solicitado para ignorar o contexto." },
-      ...conversationHistory[userNumber]],
+      // { "role": "system", "content": "" },
+      ...editedChatHistory.history],
     "temperature": 0.7,
     "max_tokens": -1,
     // "stream": true
     "stream": false
   }
+  try {
+    const { data: modelRespose } = await axios.post('http://127.0.0.1:1234/v1/chat/completions', body)
 
-  const { data: modelRespose } = await axios.post('http://127.0.0.1:1234/v1/chat/completions', body)
+    const completeMessage = modelRespose.choices[0].message.content
 
-  const completeMessage = modelRespose.choices[0].message.content
-  console.log('Reposta do modelo: ', completeMessage)
+    // console.log('completeMessage', completeMessage);
 
-  const actualResponse = completeMessage.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    const jsonStringResponse = completeMessage.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    // console.log('jsonStringResponse', jsonStringResponse);
+    let res = ''
+    try {
+      res = JSON.parse(jsonStringResponse)
+    } catch (e) {
+      console.log(e)
+      res = jsonStringResponse
+    }
 
-  console.log('Reposta final: ', actualResponse)
+    const actualResponse = res?.message || res
+    const reaction = res?.reaction || null
 
-  return actualResponse
+    // console.log('Reposta final: ', actualResponse)
+
+    const assistantResponse = { "role": "assistant", "content": actualResponse }
+
+    editedChatHistory.history.push(assistantResponse)
+    // console.log(`new conversation history for ${userNumberChatId}`, editedChatHistory.history)
+
+    const newConversationHistory = conversationHistory.filter(chat => chat.id !== userNumberChatId)
+    newConversationHistory.unshift(editedChatHistory)
+
+    fs.writeFileSync(historyFilePath, JSON.stringify(newConversationHistory));
+
+
+    return { message: actualResponse, reaction }
+
+  } catch (error) {
+    console.log(error?.response);
+
+    return { message: `Ocorreu um erro ao obter a resposta do modelo. ${error?.response?.data?.error || error}`, reaction: "😞" }
+  }
 
   // const { data: stream } = await axios.post('http://127.0.0.1:1234/v1/chat/completions', body, { responseType: 'stream' })
 
@@ -97,4 +145,20 @@ export const processMessage = async (message, userNumber, msg) => {
   //   sentence.concat(partMsg)
 
   // }
+}
+
+const d = {
+  "type": "object",
+  "required": ["message", "reaction"],
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "Mensagem de resposta em formato de texto."
+    },
+    "reaction": {
+      "type": "string",
+      "description": "Reação associada à mensagem, representada por um único emoji."
+    }
+  },
+  "additionalProperties": false
 }

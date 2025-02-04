@@ -1,10 +1,8 @@
-// const { Client } = require('whatsapp-web.js');
-// const qrcode = require('qrcode-terminal');
 import wswebjs from 'whatsapp-web.js'
 const { Client, LocalAuth } = wswebjs
 import qrcode from 'qrcode-terminal'
-import axios from 'axios';
-import { processMessage } from './src/utils/processMessage.js';
+import { processMessage } from './src/utils/processMessage.js'
+import fs from 'fs'
 
 const client = new Client({
   puppeteer: {
@@ -32,27 +30,35 @@ client.on('message_create', async (msg) => {
 
   const contact = await msg.getContact()
   // console.log('contato: ', contact.number);
-  if ((contact.number === '554797383886' || contact.number === '554792696208') && msg.body.toLocaleLowerCase().indexOf('bot') === 0) {
+  // if ((contact.number === '554797383886' || contact.number === '554792696208' || contact.number === '554799263828' || contact.number === '554796147390') && msg.body.toLocaleLowerCase().indexOf('bot') === 0) {
+  const listAllowedContacts = JSON.parse(fs.readFileSync('./src/utils/listAllowedContacts.json', { encoding: 'utf-8' }))
+
+  if (listAllowedContacts.find(cont => cont.number === contact.number) && msg.body.toLocaleLowerCase().indexOf('bot') === 0) {
     console.log('mensagem recebida: ', msg.body);
     // console.log('contato: ', contact);
     const chat = await msg.getChat()
     // console.log('chat', chat);
 
-    const treatedMessage = msg.body.replace('bot', '')
+    const treatedMessage = msg.body.replace('bot', '').trim()
 
     // client.sendMessage(chat.id._serialized, 'Pensando...')
 
 
-    const pResponse = processMessage(treatedMessage, contact.number)
+    const pResponse = processMessage(treatedMessage, contact.number, chat.id.user, msg)
 
     const interval = setInterval(() => {
       chat.sendStateTyping()
     }, 25);
 
-    const response = await pResponse
+    const { message, reaction } = await pResponse
     clearInterval(interval)
 
-    msg.reply(response)
+    console.log('reaction:', reaction);
+
+    if (reaction)
+      await msg.react(reaction)
+
+    await msg.reply(message)
   }
 });
 

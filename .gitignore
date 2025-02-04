@@ -1,2 +1,4 @@
 /node_modules
 .wwebjs*
+src/utils/conversationHistory.json
+src/utils/listAllowedContacts.json
