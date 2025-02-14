@@ -3,6 +3,7 @@ const { Client, LocalAuth } = wswebjs
 import qrcode from 'qrcode-terminal'
 import { processMessage } from './src/utils/processMessage.js'
 import fs from 'fs'
+import { processMessagePython } from './src/utils/processMessagePython.js'
 
 const client = new Client({
   puppeteer: {
@@ -23,11 +24,6 @@ client.on('ready', () => {
 });
 
 client.on('message_create', async (msg) => {
-  // if (msg.body == '!ping') {
-  //   msg.reply('pong');
-  // }
-  // console.log('mensagem recebida: ', msg.body);
-
   const contact = await msg.getContact()
   // console.log('contato: ', contact.number);
   // if ((contact.number === '554797383886' || contact.number === '554792696208' || contact.number === '554799263828' || contact.number === '554796147390') && msg.body.toLocaleLowerCase().indexOf('bot') === 0) {
@@ -39,12 +35,12 @@ client.on('message_create', async (msg) => {
     const chat = await msg.getChat()
     // console.log('chat', chat);
 
-    const treatedMessage = msg.body.replace('bot', '').trim()
+    const treatedMessage = msg.body.replace(/\b[bB][oO][tT]\b/g, '').trim()
 
     // client.sendMessage(chat.id._serialized, 'Pensando...')
 
-
-    const pResponse = processMessage(treatedMessage, contact.number, chat.id.user, msg)
+    // const pResponse = processMessage(treatedMessage, contact.number, chat.id.user, msg)
+    const pResponse = processMessagePython(treatedMessage, contact.number, chat.id.user, msg)
 
     const interval = setInterval(() => {
       chat.sendStateTyping()

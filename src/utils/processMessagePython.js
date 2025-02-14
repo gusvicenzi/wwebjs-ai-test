@@ -5,79 +5,66 @@ import fs from 'fs'
 const historyFilePath = 'src/utils/conversationHistory.json'
 const messageNumberHistory = 10
 
-export const processMessage = async (message, userNumber, chatId, msg) => {
-  const userNumberChatId = `${userNumber}${chatId}`
+export const processMessagePython = async (message, userNumber, chatId, msg) => {
+  // const userNumberChatId = `${userNumber}${chatId}`
 
-  let conversationHistory = []
-  try {
-    const arq = JSON.parse(fs.readFileSync(historyFilePath, { encoding: 'utf-8' }))
-    conversationHistory = arq
-  } catch (e) {
-  }
-
-  const savedChatHistory = conversationHistory.find(chat => chat.id === userNumberChatId)
-
-  if (!savedChatHistory)
-    conversationHistory.push({ id: userNumberChatId, history: [] })
-
-  const editedChatHistory = conversationHistory.find(chat => chat.id === userNumberChatId)
-
-  editedChatHistory.history.push({ "role": "user", "content": message })
-
-  if (editedChatHistory.history.length > messageNumberHistory * 2)
-    editedChatHistory.history.shift()
-
-  // const msgType = msg.type
-  // console.log('type', msgType)
-  // const hasMedia = msg.hasMedia
-  // console.log('has media', hasMedia)
-  // let media = null
-  // if (hasMedia) {
-  //   media = await msg.downloadMedia()
+  // let conversationHistory = []
+  // try {
+  //   const arq = JSON.parse(fs.readFileSync(historyFilePath, { encoding: 'utf-8' }))
+  //   conversationHistory = arq
+  // } catch (e) {
   // }
 
-  const body = {
-    "model": "deepseek-r1-distill-llama-8b",
-    "messages": [
-      // { "role": "system", "content": "" },
-      ...editedChatHistory.history],
-    "temperature": 0.5,
-    "max_tokens": -1,
-    // "stream": true
-    "stream": false
-  }
-  try {
-    const { data: modelRespose } = await axios.post('http://127.0.0.1:1234/v1/chat/completions', body)
+  // const savedChatHistory = conversationHistory.find(chat => chat.id === userNumberChatId)
 
-    const completeMessage = modelRespose.choices[0].message.content
+  // if (!savedChatHistory)
+  //   conversationHistory.push({ id: userNumberChatId, history: [] })
+
+  // const editedChatHistory = conversationHistory.find(chat => chat.id === userNumberChatId)
+
+  // editedChatHistory.history.push({ "role": "user", "content": message })
+
+  // if (editedChatHistory.history.length > messageNumberHistory * 2)
+  //   editedChatHistory.history.shift()
+
+  try {
+    const { data } = await axios.post('http://localhost:5000/chatbot/webhook', { message })
+
+    const llmResponse = data.message
+    console.log('llmResponse', llmResponse);
+
+    if (!llmResponse)
+      throw new Error('Nenhuma mensagem recebida do llm')
+    // const completeMessage = modelRespose.choices[0].message.content
 
     // console.log('completeMessage', completeMessage);
 
-    const jsonStringResponse = completeMessage.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    const actualResponse = llmResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
     // console.log('jsonStringResponse', jsonStringResponse);
-    let res = ''
-    try {
-      res = JSON.parse(jsonStringResponse)
-    } catch (e) {
-      console.log(e)
-      res = jsonStringResponse
-    }
+    // let res = ''
+    // try {
+    //   res = JSON.parse(jsonStringResponse)
+    // } catch (e) {
+    //   console.log(e)
+    //   res = jsonStringResponse
+    // }
 
-    const actualResponse = res?.message || res
-    const reaction = res?.reaction || null
+    // const actualResponse = res?.message || res
+    // const reaction = res?.reaction || null
 
-    // console.log('Reposta final: ', actualResponse)
+    // // console.log('Reposta final: ', actualResponse)
 
-    const assistantResponse = { "role": "assistant", "content": actualResponse }
+    // const assistantResponse = { "role": "assistant", "content": actualResponse }
 
-    editedChatHistory.history.push(assistantResponse)
-    // console.log(`new conversation history for ${userNumberChatId}`, editedChatHistory.history)
+    // editedChatHistory.history.push(assistantResponse)
+    // // console.log(`new conversation history for ${userNumberChatId}`, editedChatHistory.history)
 
-    const newConversationHistory = conversationHistory.filter(chat => chat.id !== userNumberChatId)
-    newConversationHistory.unshift(editedChatHistory)
+    // const newConversationHistory = conversationHistory.filter(chat => chat.id !== userNumberChatId)
+    // newConversationHistory.unshift(editedChatHistory)
 
-    fs.writeFileSync(historyFilePath, JSON.stringify(newConversationHistory));
+    // fs.writeFileSync(historyFilePath, JSON.stringify(newConversationHistory));
 
+    const reaction = null
 
     return { message: actualResponse, reaction }
 
